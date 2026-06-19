@@ -154,5 +154,14 @@ src/
 ---
 
 <div align="center">
+
+### Made by **Sachin Kumar** · [@iglxkardam](https://github.com/Iglxkardam)
+
+[![Portfolio](https://img.shields.io/badge/Portfolio-GitHub-181717?logo=github&logoColor=white)](https://github.com/Iglxkardam)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Sachin%20Kumar-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/sachin-kumar-2572273b3)
+[![X](https://img.shields.io/badge/X-@iglxkardam-000000?logo=x&logoColor=white)](https://x.com/Jhod869800)
+[![Instagram](https://img.shields.io/badge/Instagram-@__igl__kardam-E4405F?logo=instagram&logoColor=white)](https://www.instagram.com/_igl_kardam)
+
 <sub>Built for The Sujal Show — AI Engineer assignment.</sub>
+
 </div>

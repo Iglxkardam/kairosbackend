@@ -11,6 +11,8 @@ const schema = z.object({
   LLM_PRIMARY_MODEL: z.string().default("gemini-3.1-flash-lite"),
   OPENROUTER_API_KEY: z.string().optional(),
   LLM_FALLBACK_MODEL: z.string().default("deepseek/deepseek-v4-pro"),
+  // which provider runs text first: "gemini" (default) or "openrouter"
+  LLM_PROVIDER: z.enum(["gemini", "openrouter"]).default("gemini"),
 
   YOUTUBE_API_KEY: z.string().optional(),
   SEARCH_API_KEY: z.string().optional(),

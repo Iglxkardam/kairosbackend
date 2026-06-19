@@ -6,23 +6,29 @@ type Msg = { role: "system" | "user" | "assistant"; content: string };
 type Provider = { name: string; baseURL: string; key: string; model: string; headers?: Record<string, string> };
 
 function providers(): Provider[] {
-  const out: Provider[] = [];
-  if (env.GEMINI_API_KEY)
-    out.push({
-      name: "gemini",
-      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
-      key: env.GEMINI_API_KEY,
-      model: env.LLM_PRIMARY_MODEL,
-    });
-  if (env.OPENROUTER_API_KEY)
-    out.push({
-      name: "openrouter",
-      baseURL: "https://openrouter.ai/api/v1",
-      key: env.OPENROUTER_API_KEY,
-      model: env.LLM_FALLBACK_MODEL,
-      headers: { "HTTP-Referer": "https://kairos.app", "X-Title": "Kairos" },
-    });
-  return out;
+  const gemini: Provider[] = env.GEMINI_API_KEY
+    ? [
+        {
+          name: "gemini",
+          baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+          key: env.GEMINI_API_KEY,
+          model: env.LLM_PRIMARY_MODEL,
+        },
+      ]
+    : [];
+  const openrouter: Provider[] = env.OPENROUTER_API_KEY
+    ? [
+        {
+          name: "openrouter",
+          baseURL: "https://openrouter.ai/api/v1",
+          key: env.OPENROUTER_API_KEY,
+          model: env.LLM_FALLBACK_MODEL,
+          headers: { "HTTP-Referer": "https://kairos.app", "X-Title": "Kairos" },
+        },
+      ]
+    : [];
+  // LLM_PROVIDER=openrouter flips the order so text runs on openrouter first (gemini stays as fallback)
+  return env.LLM_PROVIDER === "openrouter" ? [...openrouter, ...gemini] : [...gemini, ...openrouter];
 }
 
 export const llmReady = () => providers().length > 0;

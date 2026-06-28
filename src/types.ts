@@ -14,6 +14,11 @@ export const thumbInput = z.object({
   topic: z.string().max(500).default(""),
 });
 
+export const voiceInput = z.object({
+  id: z.string().max(64),
+  text: z.string().min(1).max(1500),
+});
+
 export interface RawPost {
   source: "reddit" | "youtube" | "news";
   title: string;
@@ -47,6 +52,8 @@ export interface Idea {
   hashtags: string[];
   caption: string; // reel: ig caption · youtube: description · thread: one-line summary
   source?: { label: string; url: string };
+  // reels only: same 30s script in 3 forms. hinglish shows by default, hindi feeds the voice clone
+  variants?: { hinglish: string[]; english: string[]; hindi: string[] };
 }
 
 export interface SourceCounts {

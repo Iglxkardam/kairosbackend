@@ -5,13 +5,19 @@ import type { Format, Idea, Insights, RawPost, RunInput, Vibe } from "./types.js
 import { mockIdeas } from "./mock.js";
 
 // keep parsing lenient — llms wander off enums/types; normalize instead of throwing (which would dump us to mock)
+// script fields stay z.any — llms return arrays, strings, or nest the variants in an object.
+// never throw on shape; normalize in the mapping instead (a throw dumps the whole run to mock).
 const rawIdea = z.object({
   format: z.string(),
   vibe: z.string().optional(),
   hook: z.string(),
   topic: z.string().default(""),
   angle: z.string().default(""),
-  script: z.union([z.array(z.string()), z.string()]).optional(),
+  script: z.any().optional(),
+  // reels carry the spoken script in three forms; other formats just use `script`
+  scriptHinglish: z.any().optional(),
+  scriptEnglish: z.any().optional(),
+  scriptHindi: z.any().optional(),
   hashtags: z.union([z.array(z.string()), z.string()]).optional(),
   caption: z.string().optional(),
   sourceUrl: z.string().optional(),
@@ -77,16 +83,27 @@ export async function generate(
   log: Logger,
 ): Promise<{ ideas: Idea[]; mock: boolean }> {
   try {
-    const want = input.platform === "all" ? "exactly 5 instagram reels, 3 youtube videos, and 3 twitter threads" : `8-11 ${input.platform} ideas`;
+    const want = input.platform === "all" ? "exactly 5 instagram reels, 3 youtube videos, and 3 twitter posts" : `8-11 ${input.platform} ideas`;
     const out = await askJSON(
       [
         sys(
-          `you are a top crypto content strategist for an indian crypto-education brand. write ${want}. ` +
-            "each idea: hook, topic, angle, and script as an array of 3-5 short beat strings. " +
-            "for a reel each beat is a scene (e.g. '0-3s: ...'); for youtube each beat is a section (intro/point/outro); for a thread each beat is one tweet. " +
-            "also give 5-8 relevant hashtags (single words, no spaces) and a ready-to-post caption (reel = instagram caption, youtube = 2-3 sentence description, thread = one-line summary). " +
-            "ground ideas in the REAL posts provided and cite the closest one via sourceUrl. " +
-            "CONSISTENCY: every field of one idea must be about the SAME subject — the company/coin/person/event named in the hook is the exact one used in topic, angle, script and caption. never name BlackRock in the hook then Franklin Templeton in the script. don't swap entities mid-idea. " +
+          `you are the head content strategist for an indian crypto-education creator (think a sharp, contrarian "the sujal show" voice). write ${want}. ` +
+            "each idea has: hook, topic, angle, script (array of strings), hashtags, caption, sourceUrl. format the script PER PLATFORM:\n" +
+            "- reel: the ACTUAL spoken words he says to camera — one continuous monologue that genuinely FILLS ~30 seconds: ~110-140 words across 6-8 beats. each beat is a FULL spoken sentence (~12-20 words), NOT a short fragment. the middle beats must EXPLAIN — give the why, real context, a specific number/detail — so it feels rich, not a 5-line skeleton. NOT scene directions, NOT timestamps, NOT '0-3s:'. match HIS exact reel voice:\n" +
+            "  • open in the first second with urgency or a hard number — no greeting, no intro, no 'hi guys' (e.g. 'sirf ek din bacha hai...', 'bitcoin ne abhi...').\n" +
+            "  • drop a real number right after the hook, then remove one fear/barrier or raise the stakes, then unpack what it actually means for the viewer.\n" +
+            "  • hinglish: hindi sentence structure + english for crypto/tech terms (ETF, volume, bitcoin, wallet). english noun + hindi verb ('fund launch kari hai', 'profit book kar lena').\n" +
+            "  • address the viewer as aap/aapko — NEVER 'bhai'. connectors: to, aur, ye jo, na.\n" +
+            "  • checklist or build-up rhythm where it fits ('pehle ye hua, fir ye, aur ab ye').\n" +
+            "  • close with light FOMO + a keyword-comment CTA in his style ('aisi cheez bahot kam aati, samajhna hai to crypto comment kardo').\n" +
+            "  • never: self-intro, backstory, jokes, slow corporate tone, 'follow for more'.\n" +
+            "  give the SAME script in THREE forms as THREE SEPARATE TOP-LEVEL FIELDS — scriptHinglish, scriptEnglish, scriptHindi — each a flat array of strings. do NOT nest them inside `script` and do NOT use the `script` field at all for reels. all three must have the same 6-8 beats, same length & detail. scriptHinglish = roman, exactly how he talks. scriptEnglish = clean english translation. scriptHindi (for text-to-speech) = PURE DEVANAGARI: transliterate EVERY english/tech word into devanagari too (bitcoin→बिटकॉइन, crypto→क्रिप्टो, ETF→ई॰टी॰एफ़, institutional→इंस्टीट्यूशनल, on-chain→ऑन-चेन, comment→कमेंट). NEVER leave latin letters or ALL-CAPS tokens in scriptHindi — the voice would spell them out letter by letter.\n" +
+            "- youtube: written in ENGLISH. script = 3-5 beats, each a section label + one line (intro hook / main points / outro).\n" +
+            "- thread: written in ENGLISH (he posts on X in english — NEVER hinglish/hindi here). this is ONE single x post in the creator's signature style, NOT a multi-tweet thread. hook = a strong factual headline (the news/claim). script = 4-7 short STANDALONE lines, each a single concrete fact or data point with a real number where possible (one stat per line). the LAST script item is a punchy 2-4 word conviction closer (e.g. 'Real conviction.', 'Bullish.', 'Pay attention.'). no '1/' numbering, no threading words.\n" +
+            "ONLY reels are in hinglish/hindi. threads and youtube are always english.\n" +
+            "hashtags: 5-8 single words, no spaces. caption: reel = instagram caption, youtube = 2-3 sentence description, thread = one-line summary. " +
+            "ground every idea in the REAL posts provided and cite the closest one via sourceUrl — numbers in threads must come from the real posts, never invented. " +
+            "CONSISTENCY: every field of one idea is about the SAME subject — the company/coin/person/event named in the hook is the exact one used in topic, angle, script and caption. never name BlackRock in the hook then Franklin Templeton in the script. don't swap entities mid-idea. " +
             "rules: be SPECIFIC (real events/numbers), put TENSION in every hook, rotate tone & emotion (cover positive AND negative/contrarian — not just hype), sound like a real creator not AI. " +
             `never use these phrases: ${BANNED.join(", ")}. return json {ideas:[{format,vibe,hook,topic,angle,script,hashtags,caption,sourceUrl}]}.`,
         ),
@@ -95,21 +112,43 @@ export async function generate(
         ),
       ],
       outSchema,
-      { temperature: 0.9, maxTokens: 12000 },
+      { temperature: 0.9, maxTokens: 16000 },
     );
 
-    let ideas: Idea[] = out.ideas.map((i) => ({
-      id: id(),
-      format: normFormat(i.format),
-      vibe: normVibe(i.vibe),
-      hook: i.hook,
-      topic: i.topic ?? "",
-      angle: i.angle ?? "",
-      script: normScript(i.script),
-      hashtags: normTags(i.hashtags, i.topic ?? ""),
-      caption: i.caption ?? "",
-      source: i.sourceUrl ? { label: hostOf(i.sourceUrl), url: i.sourceUrl } : undefined,
-    }));
+    let ideas: Idea[] = out.ideas.map((i) => {
+      const format = normFormat(i.format);
+      let variants: Idea["variants"];
+      let script: string[];
+      if (format === "reel") {
+        // models sometimes nest the three forms inside script:{hinglish,english,hindi} instead of top-level
+        const so = i.script && typeof i.script === "object" && !Array.isArray(i.script) ? (i.script as Record<string, unknown>) : null;
+        const hinglish = normScript(i.scriptHinglish ?? so?.hinglish);
+        const english = normScript(i.scriptEnglish ?? so?.english ?? so?.en);
+        const hindi = normScript(i.scriptHindi ?? so?.hindi ?? so?.devanagari);
+        const base = hinglish.length ? hinglish : english.length ? english : normScript(i.script);
+        variants = {
+          hinglish: hinglish.length ? hinglish : base,
+          english: english.length ? english : base,
+          hindi: hindi.length ? hindi : base,
+        };
+        script = variants.hinglish; // default display
+      } else {
+        script = normScript(i.script);
+      }
+      return {
+        id: id(),
+        format,
+        vibe: normVibe(i.vibe),
+        hook: i.hook,
+        topic: i.topic ?? "",
+        angle: i.angle ?? "",
+        script,
+        hashtags: normTags(i.hashtags, i.topic ?? ""),
+        caption: i.caption ?? "",
+        source: i.sourceUrl ? { label: hostOf(i.sourceUrl), url: i.sourceUrl } : undefined,
+        variants,
+      };
+    });
     if (input.platform === "all") ideas = trimCounts(ideas);
 
     log.info({ count: ideas.length }, "generate done");

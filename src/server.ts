@@ -2,9 +2,10 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { env } from "./env.js";
 import { log } from "./log.js";
-import { runInput, thumbInput } from "./types.js";
+import { runInput, thumbInput, voiceInput } from "./types.js";
 import { run } from "./pipeline.js";
 import { thumbnail } from "./image.js";
+import { voice } from "./voice.js";
 import { createJob, failJob, finishJob, getJob } from "./jobs.js";
 import { startGen, genOk, genFail } from "./ratelimit.js";
 
@@ -79,6 +80,13 @@ app.post("/thumbnail", async (req) => {
   if (!parsed.success) return { url: null }; // graceful — card just keeps its styled cover
   // gate lives inside thumbnail() so it only counts NEW gens, never cache hits (reloads/history)
   return await thumbnail(parsed.data.format, parsed.data.hook, parsed.data.topic, parsed.data.id, clientIp(req));
+});
+
+// reads a reel script aloud in the creator's cloned voice — { url } (mp3 on r2) or { url: null }
+app.post("/voice", async (req) => {
+  const parsed = voiceInput.safeParse(req.body ?? {});
+  if (!parsed.success) return { url: null };
+  return await voice(parsed.data.id, parsed.data.text, clientIp(req));
 });
 
 try {

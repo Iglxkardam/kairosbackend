@@ -35,6 +35,17 @@ const schema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().optional(),
   R2_BUCKET: z.string().optional(),
   R2_PUBLIC_URL: z.string().optional(),
+
+  // voice clone (bonus) — reads the reel's hindi script in the creator's cloned voice. off if unset.
+  // swappable provider: cartesia (free credits, great hindi) or elevenlabs.
+  VOICE_PROVIDER: z.enum(["cartesia", "elevenlabs"]).default("cartesia"),
+  CARTESIA_API_KEY: z.string().optional(),
+  CARTESIA_VOICE_ID: z.string().optional(),
+  CARTESIA_MODEL: z.string().default("sonic-3"),
+  CARTESIA_VERSION: z.string().default("2024-11-13"),
+  ELEVENLABS_API_KEY: z.string().optional(),
+  ELEVENLABS_VOICE_ID: z.string().optional(),
+  ELEVENLABS_MODEL: z.string().default("eleven_multilingual_v2"),
 });
 
 const parsed = schema.safeParse(process.env);
